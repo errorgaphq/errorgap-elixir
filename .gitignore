@@ -1,0 +1,7 @@
+_build/
+deps/
+*.beam
+*.ez
+.fetch
+erl_crash.dump
+.DS_Store
