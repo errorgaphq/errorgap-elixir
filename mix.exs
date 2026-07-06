@@ -2,7 +2,7 @@ defmodule Errorgap.MixProject do
   use Mix.Project
 
   @version "0.1.0"
-  @source_url "https://gitlab.jgrubbs.net/jGRUBBS/errorgap-elixir"
+  @source_url "https://github.com/errorgaphq/errorgap-elixir"
 
   def project do
     [
