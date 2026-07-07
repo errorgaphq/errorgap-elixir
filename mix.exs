@@ -30,7 +30,8 @@ defmodule Errorgap.MixProject do
 
   defp deps do
     [
-      {:plug, "~> 1.15", optional: true}
+      {:plug, "~> 1.15", optional: true},
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
 
