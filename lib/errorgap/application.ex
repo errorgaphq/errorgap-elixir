@@ -8,6 +8,7 @@ defmodule Errorgap.Application do
     children = [
       Errorgap.Client
     ]
+
     Supervisor.start_link(children, strategy: :one_for_one, name: Errorgap.Supervisor)
   end
 end

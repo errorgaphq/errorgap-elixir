@@ -16,7 +16,12 @@ defmodule Errorgap.Configuration do
           async: boolean(),
           filter_keys: [String.t()],
           timeout: pos_integer(),
-          root_directory: String.t()
+          root_directory: String.t(),
+          apm_enabled: boolean(),
+          apm_sample_rate: float(),
+          logs_enabled: boolean(),
+          minimum_log_level: String.t(),
+          max_breadcrumbs: non_neg_integer()
         }
 
   defstruct endpoint: nil,
@@ -28,7 +33,12 @@ defmodule Errorgap.Configuration do
             async: true,
             filter_keys: @default_filter_keys,
             timeout: 5_000,
-            root_directory: nil
+            root_directory: nil,
+            apm_enabled: true,
+            apm_sample_rate: 1.0,
+            logs_enabled: true,
+            minimum_log_level: "info",
+            max_breadcrumbs: 25
 
   @doc "Build a Configuration from application env + ERRORGAP_* env vars."
   def build do
@@ -44,9 +54,17 @@ defmodule Errorgap.Configuration do
       async: Keyword.get(env, :async, true),
       filter_keys: Keyword.get(env, :filter_keys, @default_filter_keys),
       timeout: Keyword.get(env, :timeout, 5_000),
-      root_directory: get(env, :root_directory, "PWD", File.cwd!())
+      root_directory: get(env, :root_directory, "PWD", File.cwd!()),
+      apm_enabled: Keyword.get(env, :apm_enabled, true),
+      apm_sample_rate: Keyword.get(env, :apm_sample_rate, 1.0) |> clamp_rate(),
+      logs_enabled: Keyword.get(env, :logs_enabled, true),
+      minimum_log_level: get(env, :minimum_log_level, "ERRORGAP_MIN_LOG_LEVEL", "info"),
+      max_breadcrumbs: Keyword.get(env, :max_breadcrumbs, 25)
     }
   end
+
+  defp clamp_rate(rate) when is_number(rate), do: rate |> max(0.0) |> min(1.0) |> :erlang.float()
+  defp clamp_rate(_), do: 1.0
 
   def validate!(%__MODULE__{} = config) do
     case config.project_slug do

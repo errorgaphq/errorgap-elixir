@@ -1,7 +1,7 @@
 defmodule Errorgap.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.2.0"
   @source_url "https://github.com/errorgaphq/errorgap-elixir"
 
   def project do
@@ -38,7 +38,7 @@ defmodule Errorgap.MixProject do
   defp package do
     [
       licenses: ["MIT"],
-      links: %{"GitLab" => @source_url}
+      links: %{"GitHub" => @source_url}
     ]
   end
 end

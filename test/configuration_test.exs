@@ -3,7 +3,18 @@ defmodule Errorgap.ConfigurationTest do
 
   alias Errorgap.Configuration
 
-  @env_keys [:endpoint, :project_slug, :project_id, :api_key, :environment, :release, :async, :filter_keys, :timeout, :root_directory]
+  @env_keys [
+    :endpoint,
+    :project_slug,
+    :project_id,
+    :api_key,
+    :environment,
+    :release,
+    :async,
+    :filter_keys,
+    :timeout,
+    :root_directory
+  ]
 
   setup do
     original = Application.get_all_env(:errorgap)

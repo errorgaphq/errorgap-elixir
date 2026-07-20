@@ -6,7 +6,12 @@ defmodule Errorgap.FilterTest do
   @defaults ~w(password token secret api_key authorization cookie)
 
   test "masks filtered keys" do
-    out = Filter.params(%{"username" => "alice", "password" => "hunter2", "access_token" => "x"}, @defaults)
+    out =
+      Filter.params(
+        %{"username" => "alice", "password" => "hunter2", "access_token" => "x"},
+        @defaults
+      )
+
     assert out["username"] == "alice"
     assert out["password"] == "[FILTERED]"
     assert out["access_token"] == "[FILTERED]"
