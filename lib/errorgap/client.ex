@@ -15,10 +15,26 @@ defmodule Errorgap.Client do
   """
   def notify(error, opts) do
     config = config()
-    notice = Notice.build(error, opts, config)
+    notice = Notice.build(error, with_transaction_id(opts), config)
     submit(:notices, notice, config, Keyword.get(opts, :sync, false))
   rescue
     exc -> {:error, exc}
+  end
+
+  # The request or job this error was raised in (Errorgap.Transaction.run/2),
+  # unless the caller set one, so errorgap links the two.
+  defp with_transaction_id(opts) do
+    case Errorgap.Transaction.current_id() do
+      nil ->
+        opts
+
+      id ->
+        Keyword.update(opts, :context, %{"transaction_id" => id}, fn context ->
+          if Map.has_key?(context, :transaction_id) or Map.has_key?(context, "transaction_id"),
+            do: context,
+            else: Map.put(context, "transaction_id", id)
+        end)
+    end
   end
 
   @doc "Deliver an APM transaction (a web interaction or a background job)."
