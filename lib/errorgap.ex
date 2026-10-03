@@ -10,7 +10,7 @@ defmodule Errorgap do
   transactions (`notify_transaction/2`).
   """
 
-  @version "0.2.0"
+  @version "0.3.0"
 
   def version, do: @version
 
@@ -42,6 +42,22 @@ defmodule Errorgap do
   def notify_transaction(transaction, opts \\ []) do
     Errorgap.Client.notify_transaction(transaction, opts)
   end
+
+  @doc """
+  Run `fun` as part of a transaction: errors reported from this process
+  while it runs carry its id as `context.transaction_id`, so errorgap shows
+  the error a request actually raised on its trace.
+
+      transaction = Errorgap.Transaction.web("GET", "/orders/{id}", "/orders/7")
+      result = Errorgap.with_transaction(transaction, fn -> handle(conn) end)
+      Errorgap.notify_transaction(Map.merge(transaction, %{"status_code" => 200}))
+  """
+  @spec with_transaction(map() | binary(), (-> result)) :: result when result: any()
+  def with_transaction(transaction_or_id, fun), do: Errorgap.Transaction.run(transaction_or_id, fun)
+
+  @doc "The id of the transaction this process is running in, if any."
+  @spec current_transaction_id() :: binary() | nil
+  def current_transaction_id, do: Errorgap.Transaction.current_id()
 
   @doc """
   Record a diagnostic breadcrumb attached to subsequent notices built in this

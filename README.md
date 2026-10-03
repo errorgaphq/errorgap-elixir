@@ -122,6 +122,26 @@ Transaction.job("ReceiptJob", "mailers", duration_ms: 40.0)
 `path` is the normalized route template used for grouping; `path_raw` is the
 concrete URL. APM delivery requires `:apm_enabled` (default `true`).
 
+### Link errors to their request
+
+Every transaction has an id (`txn["id"]`). Run the work inside
+`Errorgap.with_transaction/2` and errors reported from that process carry it
+as `context.transaction_id`, so errorgap shows the error a request actually
+raised on its trace and links each occurrence to its request:
+
+```elixir
+txn = Transaction.web("GET", "/orders/{id}", "/orders/123")
+started = System.monotonic_time(:millisecond)
+result = Errorgap.with_transaction(txn, fn -> handle(conn) end)
+txn
+|> Map.merge(%{"status_code" => 200, "duration_ms" => System.monotonic_time(:millisecond) - started})
+|> Errorgap.notify_transaction()
+```
+
+The id lives in the process dictionary, so concurrent requests (separate
+processes) never share one. In a Plug pipeline, `Errorgap.Transaction.put_current/1`
+makes it current for the rest of the request process.
+
 ## Configuration reference
 
 | Key | Default | Notes |

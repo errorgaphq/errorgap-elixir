@@ -98,4 +98,55 @@ defmodule Errorgap.ClientTest do
     assert req.body =~ ~s("message":"opened cart")
     assert req.body =~ ~s("message":"tapped checkout")
   end
+
+  test "a notice inside a transaction carries its id", %{ingestor: ing} do
+    txn = Errorgap.Transaction.web("GET", "/orders/{id}", "/orders/7")
+    id = txn["id"]
+    assert id =~ ~r/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+    Errorgap.with_transaction(txn, fn ->
+      Errorgap.notify(%RuntimeError{message: "boom"}, sync: true)
+    end)
+
+    Errorgap.notify(%RuntimeError{message: "after"}, sync: true)
+    assert Errorgap.current_transaction_id() == nil
+
+    [inside, outside] = FakeIngestor.requests(ing)
+    assert inside.body =~ ~s("transaction_id":"#{id}")
+    refute outside.body =~ "transaction_id"
+  end
+
+  test "an explicit transaction id is kept", %{ingestor: ing} do
+    Errorgap.with_transaction("scoped", fn ->
+      Errorgap.notify(%RuntimeError{message: "x"}, context: %{transaction_id: "mine"}, sync: true)
+    end)
+
+    [req] = FakeIngestor.requests(ing)
+    assert req.body =~ ~s("transaction_id":"mine")
+    refute req.body =~ "scoped"
+  end
+
+  test "the transaction sends its id", %{ingestor: ing} do
+    Application.put_env(:errorgap, :apm_enabled, true)
+    Application.put_env(:errorgap, :apm_sample_rate, 1.0)
+
+    on_exit(fn ->
+      Application.delete_env(:errorgap, :apm_enabled)
+      Application.delete_env(:errorgap, :apm_sample_rate)
+    end)
+
+    txn = Errorgap.Transaction.job("ReceiptJob", "mailers", duration_ms: 4.0)
+    {:ok, %{status: 201}} = Errorgap.notify_transaction(txn, sync: true)
+    [req] = FakeIngestor.requests(ing)
+    assert req.body =~ ~s("id":"#{txn["id"]}")
+  end
+
+  test "nested scopes restore the outer id" do
+    Errorgap.with_transaction("outer", fn ->
+      assert Errorgap.with_transaction("inner", &Errorgap.current_transaction_id/0) == "inner"
+      assert Errorgap.current_transaction_id() == "outer"
+    end)
+
+    assert Errorgap.current_transaction_id() == nil
+  end
 end
