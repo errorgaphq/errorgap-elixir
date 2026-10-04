@@ -51,6 +51,19 @@ defmodule Errorgap.ApmTest do
     assert length(txn["spans"]) == 2
   end
 
+  test "web transactions record a valid browser trace id" do
+    txn =
+      Transaction.web("GET", "/o/{id}", "/o/7",
+        trace_id: " 0192F3C4-7A1B-4C2D-9E3F-0123456789AB "
+      )
+
+    assert txn["trace_id"] == "0192f3c4-7a1b-4c2d-9e3f-0123456789ab"
+    refute txn["trace_id"] == txn["id"]
+
+    refute Map.has_key?(Transaction.web("GET", "/", "/", trace_id: "not-a-uuid"), "trace_id")
+    refute Map.has_key?(Transaction.web("GET", "/", "/", trace_id: nil), "trace_id")
+  end
+
   test "job transaction shape" do
     txn = Transaction.job("ReceiptJob", "mailers", duration_ms: 40.0)
     assert txn["kind"] == "job"

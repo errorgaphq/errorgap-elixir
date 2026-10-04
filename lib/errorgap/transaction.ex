@@ -11,12 +11,34 @@ defmodule Errorgap.Transaction do
   `/orders/{id}`) and concrete `path_raw`.
 
   Options: `:status_code`, `:duration_ms`, `:environment`, `:occurred_at`,
-  `:spans`, `:id` (generated when absent).
+  `:spans`, `:id` (generated when absent), and `:trace_id` — the
+  `x-errorgap-trace` header a browser SDK sent with the request, which links
+  the browser's view of the call to this transaction (ignored unless it is a
+  well-formed UUID; see `browser_trace_id/1`).
   """
   def web(method, path, path_raw, opts \\ []) do
     base("web", opts)
     |> Map.merge(%{"method" => method, "path" => path, "path_raw" => path_raw})
+    |> maybe_put("trace_id", browser_trace_id(Keyword.get(opts, :trace_id)))
   end
+
+  @doc "The header the errorgap browser SDK sends with API calls."
+  def trace_header, do: "x-errorgap-trace"
+
+  @doc """
+  The trace id in an `x-errorgap-trace` header value, lowercased, or `nil`
+  unless it is a well-formed UUID. In a Plug pipeline:
+
+      Plug.Conn.get_req_header(conn, "x-errorgap-trace") |> List.first()
+  """
+  def browser_trace_id(header) when is_binary(header) do
+    value = header |> String.trim() |> String.downcase()
+
+    if Regex.match?(~r/\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/, value),
+      do: value
+  end
+
+  def browser_trace_id(_), do: nil
 
   @doc """
   A background-job transaction for `job_class` on `queue`.
