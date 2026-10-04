@@ -15,7 +15,7 @@ Requires Elixir 1.15+ and OTP 26+.
 
 ```elixir
 def deps do
-  [{:errorgap, "~> 0.2"}]
+  [{:errorgap, "~> 0.4"}]
 end
 ```
 
@@ -141,6 +141,16 @@ txn
 The id lives in the process dictionary, so concurrent requests (separate
 processes) never share one. In a Plug pipeline, `Errorgap.Transaction.put_current/1`
 makes it current for the rest of the request process.
+
+When the errorgap browser SDK is on the page, its API calls send an
+`x-errorgap-trace` header. Pass it as `:trace_id` and errorgap's browser
+Performance view links each call to the server request that answered it
+(malformed values are ignored):
+
+```elixir
+trace = conn |> Plug.Conn.get_req_header("x-errorgap-trace") |> List.first()
+txn = Transaction.web("GET", "/orders/{id}", conn.request_path, trace_id: trace)
+```
 
 ## Configuration reference
 
