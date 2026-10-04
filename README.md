@@ -15,7 +15,7 @@ Requires Elixir 1.15+ and OTP 26+.
 
 ```elixir
 def deps do
-  [{:errorgap, "~> 0.4"}]
+  [{:errorgap, "~> 0.5"}]
 end
 ```
 
@@ -62,6 +62,19 @@ defmodule MyAppWeb.Endpoint do
     conn
   end
 end
+```
+
+### Request performance
+
+Add `plug Errorgap.Plug, apm: true` near the top of your endpoint (or
+`Plug.Router`) and each request is an APM transaction grouped by its route
+(`/orders/:id`, from Phoenix or `Plug.Router`). Errors reported while it runs
+carry its transaction id, a request that raises is recorded as a 500 by
+`Errorgap.Plug.report/2`, and the `x-errorgap-trace` header sent by the
+errorgap browser and mobile SDKs links the caller's view of the request to it.
+
+```elixir
+plug Errorgap.Plug, apm: true
 ```
 
 ## OTP crash reports
