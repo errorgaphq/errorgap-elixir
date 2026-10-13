@@ -17,7 +17,9 @@ defmodule Errorgap.FakeIngestor do
   def stop(pid), do: GenServer.stop(pid)
 
   @impl true
-  def init(_opts) do
+  def init(opts) do
+    # `status: 429` makes every answer a rate limit with Retry-After: 120.
+    :persistent_term.put({__MODULE__, :status}, Keyword.get(opts, :status, 201))
     {:ok, listen} = :gen_tcp.listen(0, [:binary, active: false, reuseaddr: true, packet: :http])
     {:ok, port} = :inet.port(listen)
     parent = self()
@@ -66,7 +68,13 @@ defmodule Errorgap.FakeIngestor do
     GenServer.cast(parent, {:request, %{method: method, path: path, headers: headers, body: body}})
 
     response =
-      "HTTP/1.1 201 Created\r\nContent-Type: application/json\r\nContent-Length: 18\r\nConnection: close\r\n\r\n{\"group_id\":\"g_1\"}"
+      case :persistent_term.get({__MODULE__, :status}, 201) do
+        429 ->
+          "HTTP/1.1 429 Too Many Requests\r\nRetry-After: 120\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}"
+
+        _ ->
+          "HTTP/1.1 201 Created\r\nContent-Type: application/json\r\nContent-Length: 18\r\nConnection: close\r\n\r\n{\"group_id\":\"g_1\"}"
+      end
 
     :gen_tcp.send(sock, response)
     :gen_tcp.close(sock)

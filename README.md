@@ -15,7 +15,7 @@ Requires Elixir 1.15+ and OTP 26+.
 
 ```elixir
 def deps do
-  [{:errorgap, "~> 0.5"}]
+  [{:errorgap, "~> 0.6"}]
 end
 ```
 
@@ -44,6 +44,22 @@ rescue
     reraise exc, __STACKTRACE__
 end
 ```
+
+## Filtering, hooks and delivery
+
+```elixir
+config :errorgap,
+  ignore_environments: ["test"],
+  queue_size: 100,
+  # return the notice (changed or not), or false to drop it
+  before_notify: {MyApp.Errorgap, :before_notify}
+```
+
+`filter_keys` are masked at any depth in `params` and `session`, inside lists
+too, and oversized strings are cut. A send that fails on the network or with a
+5xx is retried up to three times; after a 429 the SDK stops sending for the
+server's `Retry-After`. When more than `queue_size` payloads are waiting, new
+ones are refused (`{:error, :queue_full}`) instead of growing the mailbox.
 
 ## Phoenix / Plug
 
