@@ -36,7 +36,8 @@ defmodule Errorgap.Notice do
       ],
       "context" => context,
       "environment" => stringify_keys(Keyword.get(opts, :environment, %{})),
-      "session" => stringify_keys(Keyword.get(opts, :session, %{})),
+      "session" =>
+        Filter.params(stringify_keys(Keyword.get(opts, :session, %{})), config.filter_keys),
       "params" =>
         Filter.params(stringify_keys(Keyword.get(opts, :params, %{})), config.filter_keys)
     }
