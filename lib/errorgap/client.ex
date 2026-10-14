@@ -128,6 +128,90 @@ defmodule Errorgap.Client do
   @impl true
   def init(_), do: {:ok, %{}}
 
+  # -- Remote settings --
+  #
+  # The project's remote settings (Project settings › What SDKs send in
+  # errorgap): errors, performance data or logs can be switched off there and
+  # running apps follow within a poll interval, with no deploy. Read by this
+  # process from GET /api/projects/:slug/config; until the first answer, and
+  # whenever errorgap cannot be reached, everything stays on.
+
+  @settings_key {__MODULE__, :remote_settings}
+  @default_poll 600
+  @min_poll 60
+  @remote_fields %{notices: "errors_enabled", transactions: "apm_enabled", logs: "logs_enabled"}
+
+  @doc "False only when errorgap has said to stop sending this kind of payload."
+  def remote_enabled?(resource, %Configuration{} = config) do
+    if config.remote_settings do
+      ensure_polling()
+      Map.get(:persistent_term.get(@settings_key, %{}), Map.get(@remote_fields, resource)) != false
+    else
+      true
+    end
+  end
+
+  @doc "Fetch the remote settings now. Returns true when they could be read."
+  def refresh_remote_settings(config \\ Configuration.build()) do
+    url =
+      String.to_charlist(
+        "#{trim_trailing_slash(config.endpoint)}/api/projects/#{config.project_slug}/config"
+      )
+
+    headers =
+      [{~c"user-agent", String.to_charlist("errorgap-elixir/#{Errorgap.version()}")}] ++
+        if(config.api_key in [nil, ""],
+          do: [],
+          else: [{~c"x-errorgap-project-key", String.to_charlist(config.api_key)}]
+        )
+
+    http_opts = [timeout: config.timeout, connect_timeout: config.timeout]
+
+    with {:ok, {{_, 200, _}, _headers, body}} <-
+           :httpc.request(:get, {url, headers}, http_opts, body_format: :binary) do
+      text = to_string(body)
+
+      if String.starts_with?(String.trim_leading(text), "{") do
+        settings =
+          for field <- Map.values(@remote_fields), into: %{} do
+            {field, not Regex.match?(~r/"#{field}"\s*:\s*false/, text)}
+          end
+
+        interval =
+          case Regex.run(~r/"poll_interval_seconds"\s*:\s*(\d+)/, text) do
+            [_, seconds] -> String.to_integer(seconds)
+            _ -> @default_poll
+          end
+
+        :persistent_term.put(
+          @settings_key,
+          Map.put(settings, :interval, if(interval >= @min_poll, do: interval, else: @default_poll))
+        )
+
+        true
+      else
+        false
+      end
+    else
+      _ -> false
+    end
+  rescue
+    _ -> false
+  catch
+    _, _ -> false
+  end
+
+  @doc false
+  def forget_remote_settings, do: :persistent_term.put(@settings_key, %{})
+
+  defp ensure_polling do
+    unless :persistent_term.get({__MODULE__, :polling}, false) do
+      :persistent_term.put({__MODULE__, :polling}, true)
+      if pid = Process.whereis(@name), do: send(pid, :poll_remote_settings)
+    end
+  end
+
+
   @max_attempts 3
   @retry_delay 30_000
   @backlog_size 100
@@ -138,6 +222,13 @@ defmodule Errorgap.Client do
   end
 
   @impl true
+  def handle_info(:poll_remote_settings, state) do
+    refresh_remote_settings()
+    seconds = Map.get(:persistent_term.get(@settings_key, %{}), :interval, @default_poll)
+    Process.send_after(self(), :poll_remote_settings, seconds * 1000)
+    {:noreply, state}
+  end
+
   def handle_info({:retry, resource, payload, attempt}, state) do
     state = Map.update(state, :backlog, 0, &max(&1 - 1, 0))
     {:noreply, deliver_from_queue(resource, payload, attempt, state)}
@@ -221,6 +312,9 @@ defmodule Errorgap.Client do
     cond do
       Configuration.ignored_environment?(config) ->
         {:ok, %{status: 204}}
+
+      not remote_enabled?(resource, config) ->
+        {:ok, %{status: 204, body: "switched off for this project"}}
 
       sync? ->
         deliver(resource, payload, config)

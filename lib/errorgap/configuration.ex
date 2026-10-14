@@ -24,7 +24,8 @@ defmodule Errorgap.Configuration do
           max_breadcrumbs: non_neg_integer(),
           queue_size: pos_integer(),
           ignore_environments: [String.t()],
-          before_notify: (map() -> map() | false | nil) | {module(), atom()} | nil
+          before_notify: (map() -> map() | false | nil) | {module(), atom()} | nil,
+          remote_settings: boolean()
         }
 
   defstruct endpoint: nil,
@@ -44,7 +45,8 @@ defmodule Errorgap.Configuration do
             max_breadcrumbs: 25,
             queue_size: 100,
             ignore_environments: [],
-            before_notify: nil
+            before_notify: nil,
+            remote_settings: true
 
   @doc "Build a Configuration from application env + ERRORGAP_* env vars."
   def build do
@@ -74,7 +76,11 @@ defmodule Errorgap.Configuration do
           |> Enum.map(&String.trim/1)
           |> Enum.reject(&(&1 == ""))
         end),
-      before_notify: Keyword.get(env, :before_notify)
+      before_notify: Keyword.get(env, :before_notify),
+      remote_settings:
+        Keyword.get_lazy(env, :remote_settings, fn ->
+          String.downcase(System.get_env("ERRORGAP_REMOTE_SETTINGS") || "") != "false"
+        end)
     }
   end
 

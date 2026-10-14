@@ -45,6 +45,14 @@ rescue
 end
 ```
 
+## Remote settings
+
+Errors, performance data and logs can each be switched off for a project in
+errorgap (Project settings › What SDKs send). Running nodes follow within ten
+minutes, with no deploy. If errorgap cannot be reached, everything stays on.
+`config :errorgap, remote_settings: false` (or `ERRORGAP_REMOTE_SETTINGS=false`)
+ignores the project's switches.
+
 ## Filtering, hooks and delivery
 
 ```elixir
